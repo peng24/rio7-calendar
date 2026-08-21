@@ -1,7 +1,7 @@
 import React from 'react';
 import { RefreshCw, CheckCircle2, AlertCircle, CloudOff } from 'lucide-react';
 import { useCalendar } from '../../context/CalendarContext';
-import { formatThaiDateTime } from '../../utils/dateUtils';
+import { formatThaiTimestamp } from '../../utils/dateUtils';
 import { APP_CONFIG } from '../../config/constants';
 
 export const SyncBadge: React.FC = () => {
@@ -36,7 +36,7 @@ export const SyncBadge: React.FC = () => {
 
       {syncStatus.lastSyncedAt && (
         <span className="hidden md:inline text-slate-500 text-[11px]">
-          ({formatThaiDateTime(syncStatus.lastSyncedAt.split('T')[0], syncStatus.lastSyncedAt.split('T')[1]?.substring(0, 5))})
+          ({formatThaiTimestamp(syncStatus.lastSyncedAt)})
         </span>
       )}
 

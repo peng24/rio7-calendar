@@ -2,6 +2,7 @@ import { BookingEvent, MeetingRoom, MeetingTypeOption, User, UserRole } from '..
 import { StorageService } from '../utils/storage';
 import { callGasApi, fileToBase64 } from './gasConnector';
 import { APP_CONFIG } from '../config/constants';
+import { parseIcsContent } from '../utils/icsParser';
 
 export const ApiService = {
   // ==========================================
@@ -9,18 +10,48 @@ export const ApiService = {
   // ==========================================
   
   async getEvents(startDate?: string, endDate?: string): Promise<{ events: BookingEvent[]; fromGoogle: boolean }> {
+    let googleEvents: BookingEvent[] = [];
+
+    // 1. ดึงตรงจาก Google Calendar iCal Feed (/api/ical) ซึ่งเร็วและได้ข้อมูลตรงกับ sarabun07@gmail.com ครบ 100%
     try {
-      const res = await callGasApi('listEvents', { startDate, endDate });
-      if (res.success && Array.isArray(res.events) && res.events.length > 0) {
-        // อัปเดต Cache ใน LocalStorage
-        StorageService.saveEvents(res.events);
-        StorageService.saveLastSyncTime(new Date().toISOString());
-        return { events: res.events, fromGoogle: true };
+      const icalRes = await fetch('/api/ical');
+      if (icalRes.ok) {
+        const icsText = await icalRes.text();
+        if (icsText && icsText.includes('BEGIN:VCALENDAR')) {
+          const parsed = parseIcsContent(icsText);
+          if (parsed.length > 0) {
+            googleEvents = parsed;
+          }
+        }
       }
     } catch (e) {
-      console.warn('[ApiService] Failed to fetch events from GAS:', e);
+      console.warn('[ApiService] /api/ical fetch error:', e);
     }
-    
+
+    // 2. หากดึงจาก ical ไม่สำเร็จ ให้ลองดึงผ่าน Google Apps Script Web App (listEvents)
+    if (googleEvents.length === 0) {
+      try {
+        const res = await callGasApi('listEvents', { startDate, endDate });
+        if (res.success && Array.isArray(res.events) && res.events.length > 0) {
+          googleEvents = res.events;
+        }
+      } catch (e) {
+        console.warn('[ApiService] GAS listEvents error:', e);
+      }
+    }
+
+    // 3. รวมข้อมูลและบันทึก Cache
+    if (googleEvents.length > 0) {
+      const localEvents = StorageService.getEvents();
+      // เก็บ Local-only events ที่ผู้ใช้สร้างไว้ในเครื่อง
+      const localOnly = localEvents.filter(ev => ev.id.startsWith('local_') && !googleEvents.some(g => g.title === ev.title && g.startDate === ev.startDate));
+      const merged = [...googleEvents, ...localOnly];
+      
+      StorageService.saveEvents(merged);
+      StorageService.saveLastSyncTime(new Date().toISOString());
+      return { events: merged, fromGoogle: true };
+    }
+
     // Fallback: ดึงจาก Local Storage
     const localEvents = StorageService.getEvents();
     return { events: localEvents, fromGoogle: false };
@@ -33,7 +64,6 @@ export const ApiService = {
   ): Promise<{ success: boolean; event: BookingEvent; message: string }> {
     let filePayload: any = {};
     if (attachmentFile) {
-      // ตรวจสอบขนาดไฟล์ไม่เกิน 20MB
       if (attachmentFile.size > APP_CONFIG.MAX_ATTACHMENT_SIZE_BYTES) {
         throw new Error(`ขนาดไฟล์แนบเกินกำหนด (สูงสุด ${APP_CONFIG.MAX_ATTACHMENT_SIZE_MB} MB)`);
       }
@@ -208,10 +238,8 @@ export const ApiService = {
 
   async syncWithGoogleCalendar(): Promise<{ success: boolean; count: number; message: string }> {
     try {
-      const res = await callGasApi('listEvents');
-      if (res.success && Array.isArray(res.events)) {
-        StorageService.saveEvents(res.events);
-        StorageService.saveLastSyncTime(new Date().toISOString());
+      const res = await this.getEvents();
+      if (res.fromGoogle && res.events.length > 0) {
         return {
           success: true,
           count: res.events.length,
@@ -220,8 +248,8 @@ export const ApiService = {
       }
       return {
         success: false,
-        count: 0,
-        message: res.error || res.message || 'การซิงค์ข้อมูลล้มเหลว',
+        count: res.events.length,
+        message: 'ไม่สามารถดึงข้อมูลจาก Google Calendar ได้ในขณะนี้',
       };
     } catch (e: any) {
       return {

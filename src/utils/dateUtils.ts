@@ -51,6 +51,24 @@ export function formatThaiDateTime(dateStr: string, timeStr?: string): string {
 }
 
 /**
+ * ฟอร์แมต ISO Timestamp หรือ Date เป็นเวลาไทย (GMT+7) เช่น "21 ส.ค. 2569 10:25 น."
+ */
+export function formatThaiTimestamp(input?: string | Date | null): string {
+  if (!input) return '';
+  const date = typeof input === 'string' ? new Date(input) : input;
+  if (isNaN(date.getTime())) return '';
+
+  const day = date.getDate();
+  const monthIdx = date.getMonth();
+  const beYear = toBuddhistYear(date.getFullYear());
+  const monthName = THAI_MONTHS_SHORT[monthIdx];
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  return `${day} ${monthName} ${beYear} ${hours}:${minutes} น.`;
+}
+
+/**
  * ฟอร์แมตช่วงเวลาการประชุม เช่น "14:00 - 16:00 น." หรือ "ตลอดวัน"
  */
 export function formatMeetingTimeRange(event: BookingEvent): string {

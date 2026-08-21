@@ -1,7 +1,6 @@
 /**
- * Cloudflare Pages Functions: Reverse Proxy for Google Apps Script
+ * Cloudflare Pages Functions: Reverse Proxy for Google Apps Script & Google Calendar iCal Feed
  * เส้นทาง: /api/*
- * ทำหน้าที่เป็นตัวกลางในการส่งต่อ Request ไปยัง Google Apps Script Web App
  */
 
 interface Env {
@@ -16,6 +15,7 @@ interface RequestContext {
 
 export const onRequest = async (context: RequestContext): Promise<Response> => {
   const { request, env } = context;
+  const url = new URL(request.url);
 
   // จัดการ CORS Headers
   const corsHeaders = {
@@ -32,7 +32,35 @@ export const onRequest = async (context: RequestContext): Promise<Response> => {
     });
   }
 
-  // ดึง URL ของ Google Apps Script จาก Environment Variable หรือ Header
+  // 1. Direct Google Calendar iCal Feed Proxy: /api/ical
+  if (url.pathname.includes('/api/ical')) {
+    try {
+      const icsResponse = await fetch('https://calendar.google.com/calendar/ical/sarabun07%40gmail.com/public/basic.ics', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+      const icsText = await icsResponse.text();
+      return new Response(icsText, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/calendar;charset=utf-8',
+          'Cache-Control': 'public, max-age=60',
+          ...corsHeaders,
+        },
+      });
+    } catch (err: any) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      });
+    }
+  }
+
+  // 2. Google Apps Script Web App Proxy: /api/gas หรือ /api/*
   const targetUrl = env.GAS_API_URL || request.headers.get('X-GAS-URL');
 
   if (!targetUrl) {
