@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { MeetingFormat, MeetingAttachment } from '../../types';
 import { APP_CONFIG } from '../../config/constants';
 import { ConflictAlert } from '../common/ConflictAlert';
+import { ThaiDatePicker, ThaiTimePicker } from '../common/ThaiDateTimePicker';
 import { toYyyyMmDd } from '../../utils/dateUtils';
 
 export const BookingModal: React.FC = () => {
@@ -318,12 +319,12 @@ export const BookingModal: React.FC = () => {
 
           </div>
 
-          {/* 3. วันที่และเวลา */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+          {/* 3. วันที่และเวลา (ภาษาไทย พ.ศ. และเวลา 24 ชั่วโมง) */}
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-blue-600" />
-                <span>กำหนดวันและเวลาประชุม</span>
+                <span>กำหนดวันและเวลาประชุม (ภาษาไทย พ.ศ.)</span>
               </span>
               <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600">
                 <input
@@ -336,61 +337,41 @@ export const BookingModal: React.FC = () => {
               </label>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">วันเริ่มต้น</label>
-                <input
-                  type="date"
-                  required
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    if (endDate < e.target.value) setEndDate(e.target.value);
-                  }}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold"
-                />
-              </div>
+            {/* วันเริ่มต้น และ วันสิ้นสุด */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <ThaiDatePicker
+                label="วันเริ่มต้นประชุม"
+                value={startDate}
+                onChange={(newVal) => {
+                  setStartDate(newVal);
+                  if (endDate < newVal) setEndDate(newVal);
+                }}
+              />
 
-              {!isAllDay && (
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">เวลาเริ่ม</label>
-                  <input
-                    type="time"
-                    required
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold"
-                  />
-                </div>
-              )}
+              <ThaiDatePicker
+                label="วันสิ้นสุดประชุม"
+                value={endDate}
+                minDate={startDate}
+                onChange={(newVal) => setEndDate(newVal)}
+              />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">วันสิ้นสุด</label>
-                <input
-                  type="date"
-                  required
-                  value={endDate}
-                  min={startDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold"
+            {/* เวลาเริ่ม และ เวลาสิ้นสุด (แบบ 24 ชั่วโมงภาษาไทย) */}
+            {!isAllDay && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-slate-200/80">
+                <ThaiTimePicker
+                  label="เวลาเริ่มประชุม"
+                  value={startTime}
+                  onChange={(newVal) => setStartTime(newVal)}
+                />
+
+                <ThaiTimePicker
+                  label="เวลาสิ้นสุดประชุม"
+                  value={endTime}
+                  onChange={(newVal) => setEndTime(newVal)}
                 />
               </div>
-
-              {!isAllDay && (
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">เวลาสิ้นสุด</label>
-                  <input
-                    type="time"
-                    required
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold"
-                  />
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
           {/* 4. ข้อมูลการประชุมออนไลน์ (หากเลือก Zoom / Webex / Meet) */}
