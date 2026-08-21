@@ -3,6 +3,8 @@ import { MeetingRoom, MeetingTypeOption } from '../types';
 export const APP_CONFIG = {
   APP_NAME: 'ระบบปฏิทินห้องประชุม สำนักงานชลประทานที่ 7',
   APP_SHORT_NAME: 'RIO 7 Meeting Calendar',
+  VERSION: 'v2.1.0',
+  LAST_UPDATED: '21 ส.ค. 2569 เวลา 10:35 น.',
   ORGANIZATION: 'สำนักงานชลประทานที่ 7 (สชป.7)',
   DEPARTMENT_FULL: 'สำนักงานชลประทานที่ 7 กรมชลประทาน กระทรวงเกษตรและสหกรณ์',
   CALENDAR_ID: 'sarabun07@gmail.com',

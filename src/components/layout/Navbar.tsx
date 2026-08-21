@@ -83,16 +83,22 @@ export const Navbar: React.FC = () => {
               <span className="text-xl">🌊</span>
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-base sm:text-lg font-bold tracking-tight text-white leading-tight">
                   ระบบปฏิทินห้องประชุม สชป.7
                 </h1>
                 <span className="bg-amber-400/90 text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow-sm">
                   RIO 7
                 </span>
+                <span className="bg-emerald-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  <span>{APP_CONFIG.VERSION}</span>
+                </span>
               </div>
-              <p className="text-xs text-blue-200 leading-none mt-0.5 hidden sm:block">
-                สำนักงานชลประทานที่ 7 กรมชลประทาน
+              <p className="text-[11px] text-blue-200 leading-none mt-1 hidden sm:flex items-center gap-1.5">
+                <span>สำนักงานชลประทานที่ 7</span>
+                <span>•</span>
+                <span className="text-amber-300 font-medium">อัปเดตล่าสุด: {APP_CONFIG.LAST_UPDATED}</span>
               </p>
             </div>
           </div>

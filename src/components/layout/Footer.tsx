@@ -9,13 +9,19 @@ export const Footer: React.FC = () => {
         
         {/* Left: Organization Info */}
         <div className="text-center md:text-left space-y-1">
-          <div className="flex items-center justify-center md:justify-start gap-2">
+          <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
             <span className="font-bold text-white text-sm">
               {APP_CONFIG.APP_NAME}
+            </span>
+            <span className="bg-blue-800 text-blue-200 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
+              {APP_CONFIG.VERSION}
             </span>
           </div>
           <p className="text-slate-400 text-[11px]">
             {APP_CONFIG.DEPARTMENT_FULL}
+          </p>
+          <p className="text-amber-400/90 text-[10px] font-medium">
+            อัปเดตล่าสุด: {APP_CONFIG.LAST_UPDATED}
           </p>
         </div>
 
