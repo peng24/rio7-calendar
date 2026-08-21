@@ -11,34 +11,30 @@ export const ConflictAlert: React.FC<ConflictAlertProps> = ({ conflictEvent }) =
   if (!conflictEvent) return null;
 
   return (
-    <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg mb-4 shadow-sm animate-pulse">
+    <div className="bg-amber-50 border-l-4 border-amber-500 p-3.5 rounded-r-2xl mb-3 shadow-xs">
       <div className="flex items-start">
         <div className="flex-shrink-0">
-          <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+          <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
         </div>
-        <div className="ml-3 text-sm text-red-800">
-          <h4 className="font-bold text-red-900 flex items-center gap-1.5">
-            ⚠️ ห้องประชุมนี้มีการจองซ้อนทับกันในช่วงเวลาดังกล่าว!
+        <div className="ml-3 text-xs text-amber-900 flex-1">
+          <h4 className="font-bold text-amber-950 flex items-center gap-1.5 text-xs">
+            ⚠️ แจ้งเตือน: มีการจองห้องประชุมนี้ในช่วงเวลาใกล้เคียงกัน
           </h4>
-          <div className="mt-2 text-xs space-y-1 text-red-700 bg-red-100/60 p-2.5 rounded border border-red-200">
-            <p className="font-semibold text-slate-900">
+          <div className="mt-1.5 text-[11px] space-y-0.5 text-amber-800 bg-amber-100/70 p-2.5 rounded-xl border border-amber-200">
+            <p className="font-semibold text-slate-900 truncate">
               📌 {conflictEvent.title || conflictEvent.rawTitle}
             </p>
             <div className="flex items-center gap-2 text-slate-700">
-              <Clock className="w-3.5 h-3.5 text-red-500" />
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
               <span>เวลา: {formatFullMeetingSchedule(conflictEvent)}</span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">
-              <MapPin className="w-3.5 h-3.5 text-red-500" />
-              <span>ห้อง: {conflictEvent.roomName}</span>
-            </div>
-            <div className="flex items-center gap-2 text-slate-700">
-              <UserIcon className="w-3.5 h-3.5 text-red-500" />
+              <UserIcon className="w-3.5 h-3.5 text-amber-600" />
               <span>ผู้จอง: {conflictEvent.organizerName} ({conflictEvent.department})</span>
             </div>
           </div>
-          <p className="mt-2 text-xs font-medium text-red-600">
-            * กรุณาเปลี่ยนห้องประชุมหรือปรับเวลาการประชุมใหม่เพื่อป้องกันการใช้ห้องชนกัน
+          <p className="mt-1.5 text-[10px] font-medium text-amber-700">
+            * หากได้รับการประสานงานเรียบร้อยแล้ว ท่านยังสามารถกดยืนยันการจองได้ตามปกติ
           </p>
         </div>
       </div>

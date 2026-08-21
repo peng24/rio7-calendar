@@ -3,21 +3,19 @@ import {
   X, 
   Calendar, 
   Clock, 
-  MapPin, 
   Video, 
-  Users, 
-  FileText, 
   Upload, 
   Link as LinkIcon, 
   Check, 
   AlertCircle,
   Paperclip,
-  Trash2
+  Trash2,
+  UserCheck
 } from 'lucide-react';
 import { useCalendar } from '../../context/CalendarContext';
 import { useAuth } from '../../context/AuthContext';
-import { BookingEvent, MeetingFormat, MeetingAttachment } from '../../types';
-import { APP_CONFIG, DEPARTMENTS } from '../../config/constants';
+import { MeetingFormat, MeetingAttachment } from '../../types';
+import { APP_CONFIG } from '../../config/constants';
 import { ConflictAlert } from '../common/ConflictAlert';
 import { toYyyyMmDd } from '../../utils/dateUtils';
 
@@ -35,7 +33,7 @@ export const BookingModal: React.FC = () => {
     checkConflict 
   } = useCalendar();
 
-  const { currentUser, isApproved, isPending } = useAuth();
+  const { currentUser, isPending } = useAuth();
 
   // Form States
   const [title, setTitle] = useState('');
@@ -44,7 +42,7 @@ export const BookingModal: React.FC = () => {
   const [startDate, setStartDate] = useState(initialDateForBooking || toYyyyMmDd(new Date()));
   const [startTime, setStartTime] = useState('13:30');
   const [endDate, setEndDate] = useState(initialDateForBooking || toYyyyMmDd(new Date()));
-  const [endTime, setEndTime] = useState('16:30');
+  const [endTime, setEndTime] = useState('15:30');
   const [isAllDay, setIsAllDay] = useState(false);
 
   // Online Meeting details
@@ -52,12 +50,6 @@ export const BookingModal: React.FC = () => {
   const [meetingId, setMeetingId] = useState('');
   const [passcode, setPasscode] = useState('');
 
-  // Organizer details
-  const [organizerName, setOrganizerName] = useState('');
-  const [department, setDepartment] = useState(DEPARTMENTS[0]);
-  const [contactPhone, setContactPhone] = useState('');
-  const [chairman, setChairman] = useState('');
-  const [attendeeCount, setAttendeeCount] = useState<number>(10);
   const [description, setDescription] = useState('');
 
   // File Attachments
@@ -75,18 +67,13 @@ export const BookingModal: React.FC = () => {
       setRoomId(editingEvent.roomId);
       setMeetingFormat(editingEvent.meetingFormat);
       setStartDate(editingEvent.startDate);
-      setStartTime(editingEvent.startTime || '08:30');
+      setStartTime(editingEvent.startTime || '13:30');
       setEndDate(editingEvent.endDate || editingEvent.startDate);
-      setEndTime(editingEvent.endTime || '16:30');
+      setEndTime(editingEvent.endTime || '15:30');
       setIsAllDay(editingEvent.isAllDay || false);
       setMeetingUrl(editingEvent.meetingUrl || '');
       setMeetingId(editingEvent.meetingId || '');
       setPasscode(editingEvent.passcode || '');
-      setOrganizerName(editingEvent.organizerName || '');
-      setDepartment(editingEvent.department || DEPARTMENTS[0]);
-      setContactPhone(editingEvent.contactPhone || '');
-      setChairman(editingEvent.chairman || '');
-      setAttendeeCount(editingEvent.attendeeCount || 10);
       setDescription(editingEvent.description || '');
       setExistingAttachments(editingEvent.attachments || []);
     } else {
@@ -97,23 +84,18 @@ export const BookingModal: React.FC = () => {
       setStartDate(initialDateForBooking || toYyyyMmDd(new Date()));
       setStartTime('13:30');
       setEndDate(initialDateForBooking || toYyyyMmDd(new Date()));
-      setEndTime('16:30');
+      setEndTime('15:30');
       setIsAllDay(false);
       setMeetingUrl('');
       setMeetingId('');
       setPasscode('');
-      setOrganizerName(currentUser?.name || '');
-      setDepartment(currentUser?.department || DEPARTMENTS[0]);
-      setContactPhone(currentUser?.phone || '');
-      setChairman('');
-      setAttendeeCount(15);
       setDescription('');
       setSelectedFile(null);
       setExistingAttachments([]);
       setCustomDriveLink('');
     }
     setErrorMessage('');
-  }, [editingEvent, isBookingModalOpen, initialRoomForBooking, initialDateForBooking, currentUser, rooms]);
+  }, [editingEvent, isBookingModalOpen, initialRoomForBooking, initialDateForBooking, rooms]);
 
   // Real-time Conflict Checking
   const conflict = useMemo(() => {
@@ -156,16 +138,6 @@ export const BookingModal: React.FC = () => {
       return;
     }
 
-    if (!organizerName.trim()) {
-      setErrorMessage('กรุณาระบุชื่อผู้ประสานงาน / ผู้จอง');
-      return;
-    }
-
-    if (conflict) {
-      setErrorMessage('ห้องประชุมซ้ำซ้อนกับรายการที่มีอยู่แล้ว กรุณาปรับเปลี่ยนห้องหรือเวลา');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -179,6 +151,11 @@ export const BookingModal: React.FC = () => {
           url: customDriveLink.trim(),
         });
       }
+
+      // ดึงข้อมูลผู้จัดประชุมอัตโนมัติจากบัญชีผู้ใช้ที่ล็อกอินอยู่
+      const finalOrganizer = editingEvent?.organizerName || currentUser?.name || 'ผู้ดูแลระบบ สชป.7 (Admin)';
+      const finalDept = editingEvent?.department || currentUser?.department || 'สำนักงานชลประทานที่ 7';
+      const finalPhone = editingEvent?.contactPhone || currentUser?.phone || '';
 
       const bookingPayload = {
         title: title.trim(),
@@ -194,14 +171,14 @@ export const BookingModal: React.FC = () => {
         meetingUrl: meetingUrl.trim(),
         meetingId: meetingId.trim(),
         passcode: passcode.trim(),
-        organizerName: organizerName.trim(),
-        department: department,
-        contactPhone: contactPhone.trim(),
-        chairman: chairman.trim(),
-        attendeeCount: Number(attendeeCount) || 1,
+        organizerName: finalOrganizer,
+        department: finalDept,
+        contactPhone: finalPhone,
+        chairman: '',
+        attendeeCount: 10,
         description: description.trim(),
         attachments: attachmentsPayload,
-        createdByEmail: currentUser?.email,
+        createdByEmail: currentUser?.email || 'sarabun07@gmail.com',
         createdByUserId: currentUser?.id,
       };
 
@@ -248,19 +225,27 @@ export const BookingModal: React.FC = () => {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar text-xs sm:text-sm">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar text-xs sm:text-sm">
           
+          {/* User badge */}
+          <div className="bg-blue-50/70 border border-blue-200 rounded-2xl px-3.5 py-2 flex items-center justify-between text-xs text-blue-900">
+            <span className="flex items-center gap-1.5 font-medium">
+              <UserCheck className="w-4 h-4 text-blue-600" />
+              <span>ผู้จอง: <strong>{currentUser?.name || 'ผู้ดูแลระบบ สชป.7 (Admin)'}</strong> ({currentUser?.department || 'สำนักงานชลประทานที่ 7'})</span>
+            </span>
+          </div>
+
           {/* Status Warning if User is Pending */}
           {isPending && (
             <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-amber-800 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
               <span>
-                บัญชีของคุณยังอยู่ในสถานะ <strong>รอการอนุมัติจาก Admin</strong> อาจไม่สามารถบันทึกข้อมูลเข้าสู่ระบบส่วนกลางได้
+                บัญชีของคุณยังอยู่ในสถานะ <strong>รอการอนุมัติจาก Admin</strong>
               </span>
             </div>
           )}
 
-          {/* Real-time Conflict Alert */}
+          {/* Real-time Conflict Alert (Warning) */}
           <ConflictAlert conflictEvent={conflict} />
 
           {/* Error Message */}
@@ -453,65 +438,7 @@ export const BookingModal: React.FC = () => {
             </div>
           )}
 
-          {/* 5. ข้อมูลผู้จอง / หน่วยงาน */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                หน่วยงาน / ฝ่าย <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800"
-              >
-                {DEPARTMENTS.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                ผู้ประสานงาน / ผู้จอง <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="ชื่อ-สกุล"
-                value={organizerName}
-                onChange={(e) => setOrganizerName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                เบอร์โทรศัพท์ติดต่อ
-              </label>
-              <input
-                type="text"
-                placeholder="เช่น 045-312-345 ต่อ 201 หรือ 081-xxx-xxxx"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                ประธานการประชุม (ถ้ามี)
-              </label>
-              <input
-                type="text"
-                placeholder="เช่น ผู้อำนวยการสำนักงานชลประทานที่ 7"
-                value={chairman}
-                onChange={(e) => setChairman(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
-              />
-            </div>
-          </div>
-
-          {/* 6. รายละเอียด / วาระการประชุม */}
+          {/* 5. รายละเอียด / วาระการประชุม */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               รายละเอียด / วาระการประชุม
@@ -525,7 +452,7 @@ export const BookingModal: React.FC = () => {
             />
           </div>
 
-          {/* 7. แนบไฟล์เอกสาร (Google Drive Folder: 1C7A4qaEHCpQqgVYV-uwnEGDzVqNGFZUO) */}
+          {/* 6. แนบไฟล์เอกสาร (Google Drive Folder: 1C7A4qaEHCpQqgVYV-uwnEGDzVqNGFZUO) */}
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -610,8 +537,8 @@ export const BookingModal: React.FC = () => {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !!conflict}
-              className="flex items-center gap-1.5 px-6 py-2 text-xs sm:text-sm font-bold text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-md transition-all active:scale-95"
+              disabled={isSubmitting}
+              className="flex items-center gap-1.5 px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-50 cursor-pointer rounded-xl shadow-md transition-all active:scale-95"
             >
               {isSubmitting ? (
                 <span>กำลังบันทึกและซิงค์...</span>
