@@ -250,10 +250,10 @@ export const ApiService = {
     const normalizedEmail = email.trim().toLowerCase();
 
     // Default admin shortcut for instant setup testing
-    if (normalizedEmail === 'sarabun07@gmail.com' && password === 'Admin@RIO7#2026') {
+    if (normalizedEmail === 'peng24@gmail.com' && password === 'peng24@31197012') {
       const adminUser: User = {
         id: 'usr_admin_01',
-        email: 'sarabun07@gmail.com',
+        email: 'peng24@gmail.com',
         name: 'ผู้ดูแลระบบ สชป.7 (Admin)',
         department: 'ฝ่ายบริหารทั่วไป / สชป.7',
         phone: '045-312-345',

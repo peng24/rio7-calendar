@@ -211,7 +211,7 @@ export const StorageService = {
         const initialUsers: User[] = [
           {
             id: 'usr_admin_01',
-            email: 'sarabun07@gmail.com',
+            email: 'peng24@gmail.com',
             name: 'ผู้ดูแลระบบ สชป.7 (Admin)',
             department: 'ฝ่ายบริหารทั่วไป',
             phone: '045-312-345',

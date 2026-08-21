@@ -62,8 +62,8 @@ export const LoginModal: React.FC = () => {
   };
 
   const fillAdminCredentials = () => {
-    setLoginEmail('sarabun07@gmail.com');
-    setLoginPassword('Admin@RIO7#2026');
+    setLoginEmail('peng24@gmail.com');
+    setLoginPassword('peng24@31197012');
   };
 
   return (
@@ -173,7 +173,7 @@ export const LoginModal: React.FC = () => {
 
               {/* Shortcut for Initial Admin */}
               <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-200 text-[11px] text-blue-900 flex items-center justify-between">
-                <span>บัญชี Admin เริ่มต้น: sarabun07@gmail.com</span>
+                <span>บัญชี Admin เริ่มต้น: peng24@gmail.com</span>
                 <button
                   type="button"
                   onClick={fillAdminCredentials}

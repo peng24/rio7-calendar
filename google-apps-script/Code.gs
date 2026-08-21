@@ -19,11 +19,11 @@ const CONFIG = {
   DRIVE_FOLDER_ID: '1C7A4qaEHCpQqgVYV-uwnEGDzVqNGFZUO', // โฟลเดอร์เก็บเอกสารประชุม
   SPREADSHEET_NAME: 'RIO7_Meeting_Calendar_Database',
   INITIAL_ADMIN: {
-    email: 'sarabun07@gmail.com',
+    email: 'peng24@gmail.com',
     name: 'ผู้ดูแลระบบ สชป.7 (Admin)',
     department: 'ฝ่ายบริหารทั่วไป / สชป.7',
     phone: '045-xxx-xxx',
-    password: 'Admin@RIO7#2026', // รหัสผ่านเริ่มต้น สามารถเปลี่ยนได้ภายหลัง
+    password: 'peng24@31197012', // รหัสผ่านเริ่มต้น สามารถเปลี่ยนได้ภายหลัง
   }
 };
 

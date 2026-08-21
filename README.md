@@ -109,8 +109,8 @@ git push -u origin main
 ## 🔐 บัญชีผู้ดูแลระบบเริ่มต้น (Initial Admin)
 
 ระบบได้ตั้งค่าบัญชี Admin เริ่มต้นไว้ดังนี้:
-- **Email**: `sarabun07@gmail.com`
-- **Password**: `Admin@RIO7#2026`
+- **Email**: `peng24@gmail.com`
+- **Password**: `peng24@31197012`
 
 *หลังจากเข้าสู่ระบบแล้ว สามารถเปลี่ยนรหัสผ่านและอนุมัติผู้ใช้งานคนอื่นๆ ได้ที่ไอคอนฟันเฟือง ⚙️ (Admin Dashboard) ที่มุมขวาบน*
 
