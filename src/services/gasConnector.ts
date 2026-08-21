@@ -12,58 +12,80 @@ export interface GasApiResponse<T = any> {
   user?: any;
   token?: string;
   file?: any;
+  offlineMode?: boolean;
   [key: string]: any;
 }
 
 /**
  * เรียกใช้งาน Google Apps Script Web App
- * ใช้เทคนิคส่ง HTTP POST ด้วย Content-Type: text/plain เพื่อป้องกัน CORS Preflight (OPTIONS)
- * และเปิด redirect: 'follow' เพื่อจัดการ HTTP 302 Redirect ของ Google Apps Script อัตโนมัติ
+ * 1. เรียกผ่าน Cloudflare Pages Functions Reverse Proxy (/api/gas) โดยอัตโนมัติ
+ * 2. หากไม่ได้อยู่บน Cloudflare หรือ Proxy ไม่ได้ตั้งค่า ให้ส่งตรงไปยัง GAS Web App URL ด้วย text/plain POST
  */
 export async function callGasApi<T = any>(action: string, payload: Record<string, any> = {}): Promise<GasApiResponse<T>> {
-  const gasUrl = StorageService.getGasApiUrl();
-
-  // หากยังไม่ได้ตั้งค่า Google Apps Script Web App URL ให้ส่งสถานะแจ้งเตือน
-  if (!gasUrl) {
-    return {
-      success: false,
-      message: 'ยังไม่ได้ระบุ Google Apps Script Web App URL ในระบบ (กำลังทำงานในโหมด Standalone/Local)',
-      offlineMode: true,
-    };
-  }
-
   const requestBody = {
     action,
     ...payload,
     timestamp: new Date().toISOString(),
   };
 
+  const jsonBody = JSON.stringify(requestBody);
+
+  // 1. ลองส่งผ่าน Cloudflare Pages Function Proxy (/api/gas) ก่อนเป็นอันดับแรก
   try {
-    // 1. ลองส่งผ่าน Cloudflare Functions Proxy (/api/gas) หากอยู่บน Cloudflare Pages
-    // 2. หากรันใน Local Dev หรือตรง ให้ส่งตรงไปยัง gasUrl ด้วย text/plain POST
-    const response = await fetch(gasUrl, {
+    const proxyRes = await fetch('/api/gas', {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
       },
-      body: JSON.stringify(requestBody),
-      redirect: 'follow',
+      body: jsonBody,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+    if (proxyRes.ok) {
+      const json = await proxyRes.json();
+      if (json && json.success) {
+        return json;
+      }
+      if (json && !json.offlineMode) {
+        return json;
+      }
     }
-
-    const json = await response.json();
-    return json;
-  } catch (error: any) {
-    console.warn(`[GAS Connector] Request '${action}' failed:`, error);
-    return {
-      success: false,
-      error: error.message || 'ไม่สามารถเชื่อมต่อกับ Google Apps Script ได้',
-      offlineMode: true,
-    };
+  } catch (proxyErr) {
+    // ข้ามไปลอง Direct GAS URL
   }
+
+  // 2. หาก Proxy ไม่พร้อม ให้ใช้ Direct GAS URL จาก LocalStorage
+  const gasUrl = StorageService.getGasApiUrl();
+
+  if (gasUrl) {
+    try {
+      const directRes = await fetch(gasUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: jsonBody,
+        redirect: 'follow',
+      });
+
+      if (directRes.ok) {
+        const json = await directRes.json();
+        return json;
+      }
+    } catch (directErr: any) {
+      console.warn(`[GAS Connector] Direct request '${action}' failed:`, directErr);
+      return {
+        success: false,
+        error: directErr.message || 'ไม่สามารถเชื่อมต่อกับ Google Apps Script ได้',
+        offlineMode: true,
+      };
+    }
+  }
+
+  return {
+    success: false,
+    message: 'ยังไม่ได้ระบุ Google Apps Script Web App URL หรือการเชื่อมต่อออฟไลน์',
+    offlineMode: true,
+  };
 }
 
 /**

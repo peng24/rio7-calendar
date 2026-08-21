@@ -9,16 +9,16 @@ export const ApiService = {
   // ==========================================
   
   async getEvents(startDate?: string, endDate?: string): Promise<{ events: BookingEvent[]; fromGoogle: boolean }> {
-    const gasUrl = StorageService.getGasApiUrl();
-    
-    if (gasUrl) {
+    try {
       const res = await callGasApi('listEvents', { startDate, endDate });
-      if (res.success && Array.isArray(res.events)) {
+      if (res.success && Array.isArray(res.events) && res.events.length > 0) {
         // อัปเดต Cache ใน LocalStorage
         StorageService.saveEvents(res.events);
         StorageService.saveLastSyncTime(new Date().toISOString());
         return { events: res.events, fromGoogle: true };
       }
+    } catch (e) {
+      console.warn('[ApiService] Failed to fetch events from GAS:', e);
     }
     
     // Fallback: ดึงจาก Local Storage
@@ -42,11 +42,11 @@ export const ApiService = {
         fileBase64: b64.base64,
         fileName: b64.fileName,
         fileMimeType: b64.mimeType,
+        eventDate: bookingData.startDate,
       };
     }
 
-    const gasUrl = StorageService.getGasApiUrl();
-    if (gasUrl) {
+    try {
       const res = await callGasApi('createEvent', {
         event: bookingData,
         ...filePayload,
@@ -55,13 +55,15 @@ export const ApiService = {
 
       if (res.success && res.event) {
         const currentEvents = StorageService.getEvents();
-        const updated = [res.event, ...currentEvents];
+        const updated = [res.event, ...currentEvents.filter(ev => ev.id !== res.event.id && ev.googleEventId !== res.event.id)];
         StorageService.saveEvents(updated);
         return { success: true, event: res.event, message: res.message || 'บันทึกและซิงค์กับ Google Calendar สำเร็จ' };
       }
+    } catch (e) {
+      console.warn('[ApiService] createBooking via GAS failed, falling back to local:', e);
     }
 
-    // Local / Standalone Mode
+    // Local / Standalone Fallback Mode
     const newId = 'local_' + Date.now();
     const newAttachments = [...(bookingData.attachments || [])];
     if (attachmentFile) {
@@ -115,11 +117,11 @@ export const ApiService = {
         fileBase64: b64.base64,
         fileName: b64.fileName,
         fileMimeType: b64.mimeType,
+        eventDate: bookingData.startDate,
       };
     }
 
-    const gasUrl = StorageService.getGasApiUrl();
-    if (gasUrl) {
+    try {
       const res = await callGasApi('updateEvent', {
         id: eventId,
         event: bookingData,
@@ -133,6 +135,8 @@ export const ApiService = {
         StorageService.saveEvents(updated);
         return { success: true, event: res.event, message: res.message || 'อัปเดตและซิงค์กับ Google Calendar สำเร็จ' };
       }
+    } catch (e) {
+      console.warn('[ApiService] updateBooking via GAS failed, falling back to local:', e);
     }
 
     // Local Update
@@ -177,8 +181,7 @@ export const ApiService = {
   },
 
   async deleteBooking(eventId: string, userEmail?: string): Promise<{ success: boolean; message: string }> {
-    const gasUrl = StorageService.getGasApiUrl();
-    if (gasUrl) {
+    try {
       const res = await callGasApi('deleteEvent', {
         id: eventId,
         eventId: eventId,
@@ -191,6 +194,8 @@ export const ApiService = {
         StorageService.saveEvents(updated);
         return { success: true, message: res.message || 'ลบการจองและอัปเดต Google Calendar สำเร็จ' };
       }
+    } catch (e) {
+      console.warn('[ApiService] deleteBooking via GAS failed, falling back to local:', e);
     }
 
     // Local Delete
@@ -202,31 +207,29 @@ export const ApiService = {
   },
 
   async syncWithGoogleCalendar(): Promise<{ success: boolean; count: number; message: string }> {
-    const gasUrl = StorageService.getGasApiUrl();
-    if (!gasUrl) {
+    try {
+      const res = await callGasApi('listEvents');
+      if (res.success && Array.isArray(res.events)) {
+        StorageService.saveEvents(res.events);
+        StorageService.saveLastSyncTime(new Date().toISOString());
+        return {
+          success: true,
+          count: res.events.length,
+          message: `ซิงค์ข้อมูลสำเร็จ (${res.events.length} รายการ)`,
+        };
+      }
       return {
         success: false,
         count: 0,
-        message: 'ยังไม่ได้เชื่อมต่อ Google Apps Script Web App URL',
+        message: res.error || res.message || 'การซิงค์ข้อมูลล้มเหลว',
       };
-    }
-
-    const res = await callGasApi('syncAll');
-    if (res.success && Array.isArray(res.events)) {
-      StorageService.saveEvents(res.events);
-      StorageService.saveLastSyncTime(new Date().toISOString());
+    } catch (e: any) {
       return {
-        success: true,
-        count: res.events.length,
-        message: `ซิงค์ข้อมูลสำเร็จ (${res.events.length} รายการ)`,
+        success: false,
+        count: 0,
+        message: e.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ Google Calendar',
       };
     }
-
-    return {
-      success: false,
-      count: 0,
-      message: res.error || 'การซิงค์ข้อมูลล้มเหลว',
-    };
   },
 
   // ==========================================
@@ -234,8 +237,7 @@ export const ApiService = {
   // ==========================================
 
   async login(email: string, password: string): Promise<{ success: boolean; user?: User; message: string }> {
-    const gasUrl = StorageService.getGasApiUrl();
-    if (gasUrl) {
+    try {
       const res = await callGasApi('login', { email, password });
       if (res.success && res.user) {
         StorageService.saveCurrentUser(res.user);
@@ -243,13 +245,15 @@ export const ApiService = {
       } else if (!res.offlineMode) {
         return { success: false, message: res.message || 'เข้าสู่ระบบไม่สำเร็จ' };
       }
+    } catch (e) {
+      console.warn('[ApiService] login via GAS failed, falling back to local:', e);
     }
 
     // Fallback: Local Storage Users
     const users = StorageService.getUsers();
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Default admin shortcut for instant setup testing
+    // Default admin shortcut
     if (normalizedEmail === 'peng24@gmail.com' && password === 'peng24@31197012') {
       const adminUser: User = {
         id: 'usr_admin_01',
@@ -286,14 +290,15 @@ export const ApiService = {
     phone: string;
     password?: string;
   }): Promise<{ success: boolean; user?: User; message: string }> {
-    const gasUrl = StorageService.getGasApiUrl();
-    if (gasUrl) {
+    try {
       const res = await callGasApi('register', userData);
       if (res.success && res.user) {
         return { success: true, user: res.user, message: res.message || 'ลงทะเบียนสำเร็จ รอการอนุมัติจาก Admin' };
       } else if (!res.offlineMode) {
         return { success: false, message: res.message || 'ลงทะเบียนไม่สำเร็จ' };
       }
+    } catch (e) {
+      console.warn('[ApiService] register via GAS failed, falling back to local:', e);
     }
 
     // Fallback Local Storage
@@ -309,7 +314,7 @@ export const ApiService = {
       name: userData.name.trim(),
       department: userData.department.trim(),
       phone: userData.phone.trim(),
-      role: 'pending', // ต้องให้ Admin อนุมัติก่อน
+      role: 'pending',
       createdAt: new Date().toISOString(),
     };
 
@@ -324,26 +329,28 @@ export const ApiService = {
   },
 
   async getUsers(): Promise<User[]> {
-    const gasUrl = StorageService.getGasApiUrl();
-    if (gasUrl) {
+    try {
       const res = await callGasApi('listUsers');
       if (res.success && Array.isArray(res.users)) {
         StorageService.saveUsers(res.users);
         return res.users;
       }
+    } catch (e) {
+      console.warn('[ApiService] getUsers via GAS failed:', e);
     }
     return StorageService.getUsers();
   },
 
   async updateUserRole(userId: string, newRole: UserRole, adminEmail?: string): Promise<{ success: boolean; message: string }> {
-    const gasUrl = StorageService.getGasApiUrl();
-    if (gasUrl) {
+    try {
       const res = await callGasApi('updateUserStatus', { userId, role: newRole, adminEmail });
       if (res.success) {
         const users = StorageService.getUsers().map(u => (u.id === userId ? { ...u, role: newRole } : u));
         StorageService.saveUsers(users);
         return { success: true, message: res.message || 'ปรับปรุงสิทธิ์สำเร็จ' };
       }
+    } catch (e) {
+      console.warn('[ApiService] updateUserRole via GAS failed:', e);
     }
 
     const users = StorageService.getUsers().map(u => (u.id === userId ? { ...u, role: newRole, approvedAt: new Date().toISOString(), approvedBy: adminEmail } : u));
@@ -361,10 +368,7 @@ export const ApiService = {
 
   saveRooms(rooms: MeetingRoom[]): void {
     StorageService.saveRooms(rooms);
-    const gasUrl = StorageService.getGasApiUrl();
-    if (gasUrl) {
-      callGasApi('saveRooms', { rooms });
-    }
+    callGasApi('saveRooms', { rooms }).catch(() => {});
   },
 
   getMeetingTypes(): MeetingTypeOption[] {
@@ -373,9 +377,6 @@ export const ApiService = {
 
   saveMeetingTypes(types: MeetingTypeOption[]): void {
     StorageService.saveMeetingTypes(types);
-    const gasUrl = StorageService.getGasApiUrl();
-    if (gasUrl) {
-      callGasApi('saveMeetingTypes', { meetingTypes: types });
-    }
+    callGasApi('saveMeetingTypes', { meetingTypes: types }).catch(() => {});
   },
 };

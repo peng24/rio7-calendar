@@ -21,7 +21,7 @@ export const onRequest = async (context: RequestContext): Promise<Response> => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-GAS-URL',
   };
 
   // ตอบกลับ OPTIONS Preflight ทันที
@@ -40,6 +40,7 @@ export const onRequest = async (context: RequestContext): Promise<Response> => {
       JSON.stringify({
         success: false,
         message: 'GAS_API_URL is not configured in Cloudflare environment variables.',
+        offlineMode: true,
       }),
       {
         status: 200,
@@ -80,9 +81,10 @@ export const onRequest = async (context: RequestContext): Promise<Response> => {
       JSON.stringify({
         success: false,
         error: err.message || 'Error proxying request to Google Apps Script',
+        offlineMode: true,
       }),
       {
-        status: 500,
+        status: 200,
         headers: {
           'Content-Type': 'application/json',
           ...corsHeaders,

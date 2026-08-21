@@ -4,26 +4,25 @@
  * ==============================================================================
  * 
  * สคริปต์นี้ทำหน้าที่เป็น Backend API ฟรี 100% เชื่อมต่อระหว่าง:
- * 1. Google Calendar: sarabun07@gmail.com
- * 2. Google Drive Folder: 1C7A4qaEHCpQqgVYV-uwnEGDzVqNGFZUO (สำหรับเก็บไฟล์แนบวาระการประชุม)
+ * 1. Google Calendar: sarabun07@gmail.com และ กิจกรรมของ สชป.7
+ * 2. Google Drive Folder: 1C7A4qaEHCpQqgVYV-uwnEGDzVqNGFZUO (สร้างโฟลเดอร์ ปี/เดือน/วัน ให้อัตโนมัติ)
  * 3. Google Sheets Database: สำหรับเก็บข้อมูล Users, สิทธิ์ Admin Approval, Rooms, และ Event Backups
- * 
- * วิธีการติดตั้ง: ดูในไฟล์ README_GAS.md
  */
 
 // ------------------------------------------------------------------------------
 // การตั้งค่าหลัก (Configurations)
 // ------------------------------------------------------------------------------
 const CONFIG = {
-  CALENDAR_ID: 'sarabun07@gmail.com', // หรือใช้ 'primary' หากรันภายใต้บัญชีนี้
-  DRIVE_FOLDER_ID: '1C7A4qaEHCpQqgVYV-uwnEGDzVqNGFZUO', // โฟลเดอร์เก็บเอกสารประชุม
+  CALENDAR_ID: 'sarabun07@gmail.com',
+  CALENDAR_NAME: 'กิจกรรมของ สชป.7',
+  DRIVE_FOLDER_ID: '1C7A4qaEHCpQqgVYV-uwnEGDzVqNGFZUO', // โฟลเดอร์หลักสำหรับเก็บเอกสารประชุม
   SPREADSHEET_NAME: 'RIO7_Meeting_Calendar_Database',
   INITIAL_ADMIN: {
     email: 'peng24@gmail.com',
     name: 'ผู้ดูแลระบบ สชป.7 (Admin)',
     department: 'ฝ่ายบริหารทั่วไป / สชป.7',
     phone: '045-xxx-xxx',
-    password: 'peng24@31197012', // รหัสผ่านเริ่มต้น สามารถเปลี่ยนได้ภายหลัง
+    password: 'peng24@31197012', // รหัสผ่านเริ่มต้น
   }
 };
 
@@ -53,14 +52,12 @@ function handleRequest(e, method) {
       try {
         body = JSON.parse(e.postData.contents);
       } catch (err) {
-        // หากส่งมาเป็น form-encoded หรือ raw string
         body = { rawData: e.postData.contents };
       }
     }
     
-    // รวม parameter จากทั้ง query string และ request body
     const req = Object.assign({}, params, body);
-    const action = req.action || 'ping';
+    const action = req.action || 'listEvents';
     
     let responseData = { success: false, message: 'Unknown action' };
     
@@ -163,73 +160,124 @@ function createJsonResponse(data) {
 // ------------------------------------------------------------------------------
 // Google Calendar Operations
 // ------------------------------------------------------------------------------
-function getTargetCalendar() {
-  try {
-    let cal = CalendarApp.getCalendarById(CONFIG.CALENDAR_ID);
-    if (cal) {
-      return cal;
+function getAllTargetCalendars() {
+  const calendars = [];
+  const visitedIds = {};
+  
+  function addCal(c) {
+    if (c && !visitedIds[c.getId()]) {
+      visitedIds[c.getId()] = true;
+      calendars.push(c);
     }
-    // หากรันภายใต้บัญชีเดียวกับ CALENDAR_ID หรือไม่พบปฏิทินที่ระบุ ให้ใช้ Default Calendar
-    cal = CalendarApp.getDefaultCalendar();
-    if (cal) {
-      return cal;
-    }
-    throw new Error('ไม่พบปฏิทิน ' + CONFIG.CALENDAR_ID + ' กรุณาตรวจสอบว่าได้แชร์สิทธิ์ (Make changes to events) ให้บัญชีผู้รันสคริปต์แล้ว');
-  } catch (e) {
-    Logger.log('Calendar error: ' + e.toString());
-    const defaultCal = CalendarApp.getDefaultCalendar();
-    if (defaultCal) return defaultCal;
-    throw new Error('เกิดข้อผิดพลาดในการเข้าถึง Google Calendar: ' + e.toString());
   }
+
+  // 1. ค้นหาด้วย Calendar ID 'sarabun07@gmail.com'
+  try {
+    const c1 = CalendarApp.getCalendarById(CONFIG.CALENDAR_ID);
+    if (c1) addCal(c1);
+  } catch(e) {}
+
+  // 2. ค้นหาด้วยชื่อ 'กิจกรรมของ สชป.7'
+  try {
+    const c2List = CalendarApp.getCalendarsByName(CONFIG.CALENDAR_NAME);
+    for (let i = 0; i < c2List.length; i++) addCal(c2List[i]);
+  } catch(e) {}
+
+  // 3. ค้นหาทุกปฏิทินที่เกี่ยวข้องในบัญชี
+  try {
+    const allCals = CalendarApp.getAllCalendars();
+    for (let i = 0; i < allCals.length; i++) {
+      const c = allCals[i];
+      const name = c.getName() || '';
+      const id = c.getId() || '';
+      if (id.includes('sarabun07') || name.includes('สชป.7') || name.includes('กิจกรรม') || name.includes('ชลประทาน')) {
+        addCal(c);
+      }
+    }
+  } catch(e) {}
+
+  // 4. หากยังไม่พบ ให้ใช้ Default Calendar ของบัญชี
+  if (calendars.length === 0) {
+    try {
+      const def = CalendarApp.getDefaultCalendar();
+      if (def) addCal(def);
+    } catch(e) {}
+  }
+
+  return calendars;
+}
+
+function getPrimaryWriteCalendar() {
+  const cals = getAllTargetCalendars();
+  return cals.length > 0 ? cals[0] : CalendarApp.getDefaultCalendar();
 }
 
 function listCalendarEvents(req) {
-  const cal = getTargetCalendar();
+  const calendars = getAllTargetCalendars();
   const now = new Date();
   
-  // ย้อนหลัง 3 เดือน ถึงอนาคต 1 ปี
-  const startDate = req.startDate ? new Date(req.startDate) : new Date(now.getFullYear(), now.getMonth() - 3, 1);
-  const endDate = req.endDate ? new Date(req.endDate) : new Date(now.getFullYear(), now.getMonth() + 12, 1);
+  // ดึงย้อนหลัง 1 ปี ถึง อนาคต 2 ปี (ครอบคลุมครบทุกรายการ)
+  const startDate = req.startDate ? new Date(req.startDate) : new Date(now.getFullYear() - 1, 0, 1);
+  const endDate = req.endDate ? new Date(req.endDate) : new Date(now.getFullYear() + 2, 11, 31);
   
-  const events = cal.getEvents(startDate, endDate);
+  const allEventsMap = {};
   const formattedEvents = [];
-  
-  for (let i = 0; i < events.length; i++) {
-    const ev = events[i];
-    const parsed = parseCalendarEvent(ev);
-    formattedEvents.push(parsed);
+
+  for (let c = 0; c < calendars.length; c++) {
+    const cal = calendars[c];
+    try {
+      const events = cal.getEvents(startDate, endDate);
+      for (let i = 0; i < events.length; i++) {
+        const ev = events[i];
+        const id = ev.getId();
+        if (!allEventsMap[id]) {
+          allEventsMap[id] = true;
+          const parsed = parseCalendarEvent(ev);
+          formattedEvents.push(parsed);
+        }
+      }
+    } catch (err) {
+      Logger.log('Error listing events from cal ' + c + ': ' + err.toString());
+    }
   }
   
   return {
     success: true,
     total: formattedEvents.length,
     events: formattedEvents,
+    calendarCount: calendars.length,
     calendarId: CONFIG.CALENDAR_ID
   };
 }
 
 function parseCalendarEvent(ev) {
-  const title = ev.getTitle() || '';
+  let title = ev.getTitle() || '';
   const description = ev.getDescription() || '';
   const location = ev.getLocation() || '';
   const startTime = ev.getStartTime();
   const endTime = ev.getEndTime();
   const isAllDay = ev.isAllDayEvent();
   
-  // แยกรูปแบบการประชุม เช่น (ZOOM), (WEBEX), (ONSITE) จากชื่อเรื่อง
+  // แยกรูปแบบการประชุม เช่น (ZOOM), (WEBEX), (ONSITE)
   let meetingFormat = 'onsite';
   let rawTitle = title;
-  const matchFormat = title.match(/^\s*\(([^)]+)\)\s*(.*)$/);
-  if (matchFormat) {
-    const tag = matchFormat[1].trim().toUpperCase();
-    rawTitle = matchFormat[2].trim();
-    if (tag.includes('ZOOM')) meetingFormat = 'zoom';
-    else if (tag.includes('WEBEX')) meetingFormat = 'webex';
-    else if (tag.includes('MEET')) meetingFormat = 'google_meet';
-    else if (tag.includes('TEAM')) meetingFormat = 'ms_teams';
-    else if (tag.includes('HYBRID')) meetingFormat = 'hybrid';
-    else meetingFormat = tag.toLowerCase();
+  
+  // ตรวจจับคำว่า Zoom, Webex, Meet ในชื่อเรื่อง
+  if (/zoom/i.test(title)) {
+    meetingFormat = 'zoom';
+  } else if (/webex/i.test(title)) {
+    meetingFormat = 'webex';
+  } else if (/meet/i.test(title)) {
+    meetingFormat = 'google_meet';
+  } else if (/team/i.test(title)) {
+    meetingFormat = 'ms_teams';
+  } else if (/hybrid/i.test(title)) {
+    meetingFormat = 'hybrid';
   }
+
+  // ตัดเวลาและแท็กหน้าชื่อเรื่องออก เช่น "09:30 น. (Zoom) ..." หรือ "(ZOOM) ..."
+  rawTitle = title.replace(/^\s*\d{1,2}[:.]\d{2}\s*น\.\s*/i, '').replace(/^\s*\([^)]+\)\s*/i, '').trim();
+  if (!rawTitle) rawTitle = title;
   
   // สกัดข้อมูลจาก Description
   let meetingId = '';
@@ -268,13 +316,19 @@ function parseCalendarEvent(ev) {
     });
   }
   
+  // กำหนดชื่อห้องประชุม
+  let roomName = location;
+  if (!roomName) {
+    roomName = meetingFormat === 'zoom' || meetingFormat === 'webex' ? 'ห้องประชุม SWOC7' : 'ห้องประชุมชั้น 3 อาคารอำนวยการ';
+  }
+  
   return {
     id: ev.getId(),
     googleEventId: ev.getId(),
     title: title,
     rawTitle: rawTitle || title,
-    roomId: location || 'room-swoc7',
-    roomName: location || 'ห้องประชุม SWOC7',
+    roomId: roomName,
+    roomName: roomName,
     meetingFormat: meetingFormat,
     startDate: Utilities.formatDate(startTime, "Asia/Bangkok", "yyyy-MM-dd"),
     startTime: isAllDay ? "08:30" : Utilities.formatDate(startTime, "Asia/Bangkok", "HH:mm"),
@@ -296,118 +350,13 @@ function parseCalendarEvent(ev) {
 }
 
 function createCalendarEvent(req, db) {
-  const cal = getTargetCalendar();
+  const cal = getPrimaryWriteCalendar();
   const eventData = req.event || req;
   
-  // 1. จัดการไฟล์แนบ (ถ้ามีการอัปโหลด base64 file)
+  // 1. จัดการไฟล์แนบ (อัปโหลดเข้าสู่ Google Drive พร้อมสร้างโฟลเดอร์ ปี/เดือน/วัน อัตโนมัติ)
   let attachments = eventData.attachments || [];
   if (req.fileBase64 && req.fileName) {
-    const uploaded = saveBase64FileToDrive(req.fileName, req.fileBase64, req.fileMimeType);
-    if (uploaded && uploaded.url) {
-      attachments.push({
-        name: req.fileName,
-        url: uploaded.url,
-        driveFileId: uploaded.id
-      });
-    }
-  }
-  
-  // 2. จัดรูปแบบ Title ตามตัวอย่าง: (ZOOM) ประชุมคณะกรรมการ...
-  const formatTag = (eventData.meetingFormat || 'ONSITE').toUpperCase();
-  let cleanTitle = eventData.rawTitle || eventData.title || 'การประชุม สชป.7';
-  cleanTitle = cleanTitle.replace(/^\s*\([^)]+\)\s*/, ''); // ลบ tag เดิมออกถ้ามี
-  const fullTitle = `(${formatTag}) ${cleanTitle}`;
-  
-  // 3. จัดการวันและเวลา
-  const startDateTime = new Date(`${eventData.startDate}T${eventData.startTime || '08:30'}:00+07:00`);
-  const endDateTime = new Date(`${eventData.endDate || eventData.startDate}T${eventData.endTime || '16:30'}:00+07:00`);
-  
-  // 4. ประกอบ Description ที่สมบูรณ์
-  let descParts = [];
-  if (cleanTitle) descParts.push(`วาระ/เรื่อง: ${cleanTitle}`);
-  if (eventData.description) descParts.push(`\nรายละเอียด:\n${eventData.description}`);
-  
-  if (eventData.meetingId) descParts.push(`\nMeeting ID: ${eventData.meetingId}`);
-  if (eventData.passcode) descParts.push(`Passcode: ${eventData.passcode}`);
-  if (eventData.meetingUrl) descParts.push(`ลิงก์การประชุม: ${eventData.meetingUrl}`);
-  
-  descParts.push(`\n--- ข้อมูลผู้จอง ---`);
-  if (eventData.organizerName) descParts.push(`ผู้จอง/ผู้ประสานงาน: ${eventData.organizerName}`);
-  if (eventData.department) descParts.push(`หน่วยงาน/ฝ่าย: ${eventData.department}`);
-  if (eventData.contactPhone) descParts.push(`เบอร์ติดต่อ: ${eventData.contactPhone}`);
-  if (eventData.chairman) descParts.push(`ประธานการประชุม: ${eventData.chairman}`);
-  
-  if (attachments.length > 0) {
-    descParts.push(`\n--- เอกสารแนบ (Google Drive) ---`);
-    attachments.forEach(att => {
-      descParts.push(`📎 ไฟล์แนบ: ${att.name} (${att.url})`);
-    });
-  }
-  
-  const fullDescription = descParts.join('\n');
-  const location = eventData.roomName || 'ห้องประชุม SWOC7';
-  
-  // 5. บันทึกลงใน Google Calendar
-  let gEvent;
-  if (eventData.isAllDay) {
-    const sDate = new Date(`${eventData.startDate}T00:00:00+07:00`);
-    const eDate = new Date(`${eventData.endDate || eventData.startDate}T23:59:59+07:00`);
-    gEvent = cal.createAllDayEvent(fullTitle, sDate, {
-      description: fullDescription,
-      location: location
-    });
-  } else {
-    gEvent = cal.createEvent(fullTitle, startDateTime, endDateTime, {
-      description: fullDescription,
-      location: location
-    });
-  }
-  
-  const createdId = gEvent.getId();
-  
-  // 6. บันทึกลง Google Sheet สำหรับประวัติ/Audit Log
-  logEventToSheet(db, {
-    id: createdId,
-    title: fullTitle,
-    room: location,
-    startDate: eventData.startDate,
-    startTime: eventData.startTime,
-    endDate: eventData.endDate,
-    endTime: eventData.endTime,
-    organizer: eventData.organizerName,
-    department: eventData.department,
-    createdBy: req.userEmail || eventData.createdByEmail || 'anonymous',
-    action: 'CREATE',
-    timestamp: new Date().toISOString()
-  });
-  
-  return {
-    success: true,
-    message: 'สร้างการจองและซิงค์กับ Google Calendar สำเร็จ',
-    eventId: createdId,
-    event: parseCalendarEvent(gEvent),
-    attachments: attachments
-  };
-}
-
-function updateCalendarEvent(req, db) {
-  const cal = getTargetCalendar();
-  const eventData = req.event || req;
-  const eventId = req.id || eventData.id || eventData.googleEventId;
-  
-  if (!eventId) {
-    return { success: false, message: 'ไม่พบ Event ID ที่ต้องการแก้ไข' };
-  }
-  
-  const gEvent = cal.getEventById(eventId);
-  if (!gEvent) {
-    return { success: false, message: 'ไม่พบกิจกรรมนี้ใน Google Calendar (อาจถูกลบไปแล้ว)' };
-  }
-  
-  // 1. จัดการไฟล์แนบเพิ่มเติม
-  let attachments = eventData.attachments || [];
-  if (req.fileBase64 && req.fileName) {
-    const uploaded = saveBase64FileToDrive(req.fileName, req.fileBase64, req.fileMimeType);
+    const uploaded = saveBase64FileToDrive(req.fileName, req.fileBase64, req.fileMimeType, eventData.startDate);
     if (uploaded && uploaded.url) {
       attachments.push({
         name: req.fileName,
@@ -440,7 +389,105 @@ function updateCalendarEvent(req, db) {
   if (eventData.organizerName) descParts.push(`ผู้จอง/ผู้ประสานงาน: ${eventData.organizerName}`);
   if (eventData.department) descParts.push(`หน่วยงาน/ฝ่าย: ${eventData.department}`);
   if (eventData.contactPhone) descParts.push(`เบอร์ติดต่อ: ${eventData.contactPhone}`);
-  if (eventData.chairman) descParts.push(`ประธานการประชุม: ${eventData.chairman}`);
+  
+  if (attachments.length > 0) {
+    descParts.push(`\n--- เอกสารแนบ (Google Drive) ---`);
+    attachments.forEach(att => {
+      descParts.push(`📎 ไฟล์แนบ: ${att.name} (${att.url})`);
+    });
+  }
+  
+  const fullDescription = descParts.join('\n');
+  const location = eventData.roomName || 'ห้องประชุม SWOC7';
+  
+  // 5. บันทึกลงใน Google Calendar
+  let gEvent;
+  if (eventData.isAllDay) {
+    const sDate = new Date(`${eventData.startDate}T00:00:00+07:00`);
+    const eDate = new Date(`${eventData.endDate || eventData.startDate}T23:59:59+07:00`);
+    gEvent = cal.createAllDayEvent(fullTitle, sDate, {
+      description: fullDescription,
+      location: location
+    });
+  } else {
+    gEvent = cal.createEvent(fullTitle, startDateTime, endDateTime, {
+      description: fullDescription,
+      location: location
+    });
+  }
+  
+  const createdId = gEvent.getId();
+  
+  return {
+    success: true,
+    message: 'สร้างการจองและซิงค์กับ Google Calendar สำเร็จ',
+    eventId: createdId,
+    event: parseCalendarEvent(gEvent),
+    attachments: attachments
+  };
+}
+
+function updateCalendarEvent(req, db) {
+  const cal = getPrimaryWriteCalendar();
+  const eventData = req.event || req;
+  const eventId = req.id || eventData.id || eventData.googleEventId;
+  
+  if (!eventId) {
+    return { success: false, message: 'ไม่พบ Event ID ที่ต้องการแก้ไข' };
+  }
+  
+  let gEvent = null;
+  const cals = getAllTargetCalendars();
+  for (let i = 0; i < cals.length; i++) {
+    try {
+      const ev = cals[i].getEventById(eventId);
+      if (ev) {
+        gEvent = ev;
+        break;
+      }
+    } catch(e) {}
+  }
+  
+  if (!gEvent) {
+    return { success: false, message: 'ไม่พบกิจกรรมนี้ใน Google Calendar' };
+  }
+  
+  // 1. จัดการไฟล์แนบเพิ่มเติม (เข้าสู่โฟลเดอร์ ปี/เดือน/วัน)
+  let attachments = eventData.attachments || [];
+  if (req.fileBase64 && req.fileName) {
+    const uploaded = saveBase64FileToDrive(req.fileName, req.fileBase64, req.fileMimeType, eventData.startDate);
+    if (uploaded && uploaded.url) {
+      attachments.push({
+        name: req.fileName,
+        url: uploaded.url,
+        driveFileId: uploaded.id
+      });
+    }
+  }
+  
+  // 2. Format Title
+  const formatTag = (eventData.meetingFormat || 'ONSITE').toUpperCase();
+  let cleanTitle = eventData.rawTitle || eventData.title || 'การประชุม สชป.7';
+  cleanTitle = cleanTitle.replace(/^\s*\([^)]+\)\s*/, '');
+  const fullTitle = `(${formatTag}) ${cleanTitle}`;
+  
+  // 3. วันและเวลา
+  const startDateTime = new Date(`${eventData.startDate}T${eventData.startTime || '08:30'}:00+07:00`);
+  const endDateTime = new Date(`${eventData.endDate || eventData.startDate}T${eventData.endTime || '16:30'}:00+07:00`);
+  
+  // 4. Description
+  let descParts = [];
+  if (cleanTitle) descParts.push(`วาระ/เรื่อง: ${cleanTitle}`);
+  if (eventData.description) descParts.push(`\nรายละเอียด:\n${eventData.description}`);
+  
+  if (eventData.meetingId) descParts.push(`\nMeeting ID: ${eventData.meetingId}`);
+  if (eventData.passcode) descParts.push(`Passcode: ${eventData.passcode}`);
+  if (eventData.meetingUrl) descParts.push(`ลิงก์การประชุม: ${eventData.meetingUrl}`);
+  
+  descParts.push(`\n--- ข้อมูลผู้จอง ---`);
+  if (eventData.organizerName) descParts.push(`ผู้จอง/ผู้ประสานงาน: ${eventData.organizerName}`);
+  if (eventData.department) descParts.push(`หน่วยงาน/ฝ่าย: ${eventData.department}`);
+  if (eventData.contactPhone) descParts.push(`เบอร์ติดต่อ: ${eventData.contactPhone}`);
   
   if (attachments.length > 0) {
     descParts.push(`\n--- เอกสารแนบ (Google Drive) ---`);
@@ -465,22 +512,6 @@ function updateCalendarEvent(req, db) {
     gEvent.setTime(startDateTime, endDateTime);
   }
   
-  // Log การแก้ไข
-  logEventToSheet(db, {
-    id: eventId,
-    title: fullTitle,
-    room: location,
-    startDate: eventData.startDate,
-    startTime: eventData.startTime,
-    endDate: eventData.endDate,
-    endTime: eventData.endTime,
-    organizer: eventData.organizerName,
-    department: eventData.department,
-    createdBy: req.userEmail || 'anonymous',
-    action: 'UPDATE',
-    timestamp: new Date().toISOString()
-  });
-  
   return {
     success: true,
     message: 'อัปเดตการจองใน Google Calendar สำเร็จ',
@@ -490,34 +521,23 @@ function updateCalendarEvent(req, db) {
 }
 
 function deleteCalendarEvent(req, db) {
-  const cal = getTargetCalendar();
   const eventId = req.id || req.eventId;
-  
   if (!eventId) {
     return { success: false, message: 'ไม่พบ Event ID ที่ต้องการลบ' };
   }
   
-  try {
-    const gEvent = cal.getEventById(eventId);
-    if (gEvent) {
-      const title = gEvent.getTitle();
-      gEvent.deleteEvent();
-      
-      logEventToSheet(db, {
-        id: eventId,
-        title: title,
-        action: 'DELETE',
-        createdBy: req.userEmail || 'anonymous',
-        timestamp: new Date().toISOString()
-      });
-      
-      return { success: true, message: 'ลบกิจกรรมออกจาก Google Calendar สำเร็จ', eventId: eventId };
-    } else {
-      return { success: false, message: 'ไม่พบกิจกรรมนี้ใน Google Calendar' };
-    }
-  } catch (e) {
-    return { success: false, message: 'เกิดข้อผิดพลาดในการลบ: ' + e.toString() };
+  const cals = getAllTargetCalendars();
+  for (let i = 0; i < cals.length; i++) {
+    try {
+      const ev = cals[i].getEventById(eventId);
+      if (ev) {
+        ev.deleteEvent();
+        return { success: true, message: 'ลบกิจกรรมออกจาก Google Calendar สำเร็จ', eventId: eventId };
+      }
+    } catch(e) {}
   }
+  
+  return { success: false, message: 'ไม่พบกิจกรรมนี้ใน Google Calendar' };
 }
 
 function syncAllCalendarEvents(db) {
@@ -525,17 +545,50 @@ function syncAllCalendarEvents(db) {
 }
 
 // ------------------------------------------------------------------------------
-// Google Drive Operations (Folder: 1C7A4qaEHCpQqgVYV-uwnEGDzVqNGFZUO)
+// Google Drive Operations (โฟลเดอร์ ปี / เดือน / วัน อัตโนมัติ)
 // ------------------------------------------------------------------------------
 function getTargetDriveFolder() {
   try {
     return DriveApp.getFolderById(CONFIG.DRIVE_FOLDER_ID);
   } catch (e) {
-    // หากเข้าถึงโฟลเดอร์ที่ระบุไม่ได้ ให้ใช้ Root หรือสร้างโฟลเดอร์ใหม่
     const folders = DriveApp.getFoldersByName('RIO7_Meeting_Documents');
     if (folders.hasNext()) return folders.next();
     return DriveApp.createFolder('RIO7_Meeting_Documents');
   }
+}
+
+function getOrCreateSubFolder(parentFolder, name) {
+  const folders = parentFolder.getFoldersByName(name);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return parentFolder.createFolder(name);
+}
+
+function getOrCreateDatedFolder(rootFolder, eventDate) {
+  let dateObj = new Date();
+  if (eventDate) {
+    const parsed = new Date(eventDate);
+    if (!isNaN(parsed.getTime())) {
+      dateObj = parsed;
+    }
+  }
+  
+  const beYear = (dateObj.getFullYear() + 543).toString(); // เช่น "2569"
+  const monthNames = [
+    '01_มกราคม', '02_กุมภาพันธ์', '03_มีนาคม', '04_เมษายน',
+    '05_พฤษภาคม', '06_มิถุนายน', '07_กรกฎาคม', '08_สิงหาคม',
+    '09_กันยายน', '10_ตุลาคม', '11_พฤศจิกายน', '12_ธันวาคม'
+  ];
+  const monthStr = monthNames[dateObj.getMonth()];
+  const dayStr = 'วันที่_' + String(dateObj.getDate()).padStart(2, '0');
+
+  // สร้างลำดับโฟลเดอร์: [โฟลเดอร์หลัก] -> [ปี พ.ศ. 2569] -> [08_สิงหาคม] -> [วันที่_22]
+  const yearFolder = getOrCreateSubFolder(rootFolder, beYear);
+  const monthFolder = getOrCreateSubFolder(yearFolder, monthStr);
+  const dayFolder = getOrCreateSubFolder(monthFolder, dayStr);
+
+  return dayFolder;
 }
 
 function uploadFileToDrive(req) {
@@ -543,7 +596,7 @@ function uploadFileToDrive(req) {
     return { success: false, message: 'ไม่พบข้อมูลไฟล์ที่ต้องการอัปโหลด' };
   }
   
-  const result = saveBase64FileToDrive(req.fileName, req.fileBase64, req.fileMimeType);
+  const result = saveBase64FileToDrive(req.fileName, req.fileBase64, req.fileMimeType, req.eventDate);
   return {
     success: true,
     message: 'อัปโหลดไฟล์ไปยัง Google Drive สำเร็จ',
@@ -551,24 +604,26 @@ function uploadFileToDrive(req) {
   };
 }
 
-function saveBase64FileToDrive(fileName, base64Data, mimeType) {
+function saveBase64FileToDrive(fileName, base64Data, mimeType, eventDate) {
   try {
-    const folder = getTargetDriveFolder();
+    const rootFolder = getTargetDriveFolder();
+    const targetFolder = getOrCreateDatedFolder(rootFolder, eventDate);
     
     // ตัด header data URL ออกถ้ามี เช่น "data:application/pdf;base64,"
     const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
     const decodedBytes = Utilities.base64Decode(cleanBase64);
     const blob = Utilities.newBlob(decodedBytes, mimeType || 'application/octet-stream', fileName);
     
-    const file = folder.createFile(blob);
-    // ตั้งค่าสิทธิ์ให้อ่านได้ทุกคนที่มีลิงก์ (Anyone with link can view)
+    const file = targetFolder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
-    const webViewUrl = file.getUrl();
-    const downloadUrl = file.getDownloadUrl();
+    const fileId = file.getId();
+    // ลิงก์ตรงที่เปิดดูไฟล์ใน Google Drive ทันที
+    const webViewUrl = 'https://drive.google.com/file/d/' + fileId + '/view?usp=sharing';
+    const downloadUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
     
     return {
-      id: file.getId(),
+      id: fileId,
       name: file.getName(),
       url: webViewUrl,
       downloadUrl: downloadUrl,
@@ -614,7 +669,6 @@ function registerUser(req, db) {
   }
   
   const users = sheet.getDataRange().getValues();
-  // ข้าม header row 0
   for (let i = 1; i < users.length; i++) {
     if (users[i][1] && users[i][1].toString().toLowerCase() === email) {
       return { success: false, message: 'อีเมลนี้ลงทะเบียนในระบบแล้ว' };
@@ -625,22 +679,10 @@ function registerUser(req, db) {
   const passwordHash = hashPassword(password, salt);
   const userId = 'usr_' + Utilities.getUuid().substring(0, 8);
   const nowStr = new Date().toISOString();
-  
-  // ผู้ลงทะเบียนใหม่จะมีสถานะเป็น 'pending' รอ Admin อนุมัติ
   const role = 'pending';
   
   sheet.appendRow([
-    userId,
-    email,
-    name,
-    department,
-    phone,
-    passwordHash,
-    salt,
-    role,
-    nowStr,
-    '', // approvedAt
-    ''  // approvedBy
+    userId, email, name, department, phone, passwordHash, salt, role, nowStr, '', ''
   ]);
   
   return {
@@ -742,7 +784,7 @@ function listUsers(req, db) {
 function updateUserStatus(req, db) {
   const sheet = db.getSheetByName('Users');
   const userId = req.userId;
-  const newRole = req.role; // 'admin', 'user', 'pending', 'disabled'
+  const newRole = req.role;
   const adminEmail = req.adminEmail || 'admin';
   
   if (!userId || !newRole) {
@@ -752,7 +794,6 @@ function updateUserStatus(req, db) {
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === userId) {
-      // คอลัมน์ 8 (Index 7) คือ Role, 10 (Index 9) คือ ApprovedAt, 11 (Index 10) คือ ApprovedBy
       sheet.getRange(i + 1, 8).setValue(newRole);
       sheet.getRange(i + 1, 10).setValue(new Date().toISOString());
       sheet.getRange(i + 1, 11).setValue(adminEmail);
@@ -779,7 +820,6 @@ function initDatabase() {
     ss = SpreadsheetApp.create(CONFIG.SPREADSHEET_NAME);
   }
   
-  // Sheet: Users
   let userSheet = ss.getSheetByName('Users');
   if (!userSheet) {
     userSheet = ss.insertSheet('Users');
@@ -787,7 +827,6 @@ function initDatabase() {
       'ID', 'Email', 'FullName', 'Department', 'Phone', 'PasswordHash', 'Salt', 'Role', 'CreatedAt', 'ApprovedAt', 'ApprovedBy'
     ]);
     
-    // สร้าง Initial Admin บัญชีแรก
     const salt = Utilities.getUuid();
     const hash = hashPassword(CONFIG.INITIAL_ADMIN.password, salt);
     userSheet.appendRow([
@@ -805,7 +844,6 @@ function initDatabase() {
     ]);
   }
   
-  // Sheet: EventLogs
   let logSheet = ss.getSheetByName('EventLogs');
   if (!logSheet) {
     logSheet = ss.insertSheet('EventLogs');
@@ -814,7 +852,6 @@ function initDatabase() {
     ]);
   }
   
-  // ลบ Sheet1 เริ่มต้นทิ้งถ้ามี
   const defaultSheet = ss.getSheetByName('Sheet1');
   if (defaultSheet && ss.getSheets().length > 1) {
     try { ss.deleteSheet(defaultSheet); } catch(e) {}
@@ -823,36 +860,8 @@ function initDatabase() {
   return ss;
 }
 
-function logEventToSheet(db, data) {
-  try {
-    const sheet = db.getSheetByName('EventLogs');
-    if (sheet) {
-      sheet.appendRow([
-        data.id || '',
-        data.title || '',
-        data.room || '',
-        data.startDate || '',
-        data.startTime || '',
-        data.endDate || '',
-        data.endTime || '',
-        data.organizer || '',
-        data.department || '',
-        data.action || 'LOG',
-        data.createdBy || '',
-        data.timestamp || new Date().toISOString()
-      ]);
-    }
-  } catch (e) {
-    Logger.log('Error logging event: ' + e.toString());
-  }
-}
-
 function getRooms(db) {
-  // หากมีบันทึกใน Sheet ให้ดึงมา หรือคืนค่า default
-  return {
-    success: true,
-    rooms: [] // Frontend จะรวมกับ default rooms
-  };
+  return { success: true, rooms: [] };
 }
 
 function saveRooms(req, db) {
@@ -860,10 +869,7 @@ function saveRooms(req, db) {
 }
 
 function getMeetingTypes(db) {
-  return {
-    success: true,
-    meetingTypes: []
-  };
+  return { success: true, meetingTypes: [] };
 }
 
 function saveMeetingTypes(req, db) {
