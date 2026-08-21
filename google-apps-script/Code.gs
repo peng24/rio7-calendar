@@ -166,12 +166,20 @@ function createJsonResponse(data) {
 function getTargetCalendar() {
   try {
     let cal = CalendarApp.getCalendarById(CONFIG.CALENDAR_ID);
-    if (!cal) {
-      cal = CalendarApp.getDefaultCalendar();
+    if (cal) {
+      return cal;
     }
-    return cal;
+    // หากรันภายใต้บัญชีเดียวกับ CALENDAR_ID หรือไม่พบปฏิทินที่ระบุ ให้ใช้ Default Calendar
+    cal = CalendarApp.getDefaultCalendar();
+    if (cal) {
+      return cal;
+    }
+    throw new Error('ไม่พบปฏิทิน ' + CONFIG.CALENDAR_ID + ' กรุณาตรวจสอบว่าได้แชร์สิทธิ์ (Make changes to events) ให้บัญชีผู้รันสคริปต์แล้ว');
   } catch (e) {
-    return CalendarApp.getDefaultCalendar();
+    Logger.log('Calendar error: ' + e.toString());
+    const defaultCal = CalendarApp.getDefaultCalendar();
+    if (defaultCal) return defaultCal;
+    throw new Error('เกิดข้อผิดพลาดในการเข้าถึง Google Calendar: ' + e.toString());
   }
 }
 

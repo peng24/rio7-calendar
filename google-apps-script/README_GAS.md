@@ -10,8 +10,17 @@ Backend นี้ใช้ Google Apps Script ทำหน้าที่เช�
 
 ## ขั้นตอนการติดตั้ง (ทำเพียงครั้งเดียว ใช้เวลาประมาณ 3 นาที)
 
+### 📌 กรณีใช้บัญชี `peng24@gmail.com` ในการสร้าง Web App:
+เพื่อให้ `peng24@gmail.com` สามารถจัดการปฏิทินของ `sarabun07@gmail.com` ได้:
+1. ให้ล็อกอินเข้า [Google Calendar](https://calendar.google.com) ด้วยบัญชี `sarabun07@gmail.com`
+2. ที่เมนูด้านซ้าย ในส่วน **"ปฏิทินของฉัน" (My calendars)** -> ชี้ที่ปฏิทิน -> คลิกจุด 3 จุด `︙` -> เลือก **"การตั้งค่าและการแชร์" (Settings and sharing)**
+3. เลื่อนลงมาที่หัวข้อ **"แชร์กับบุคคลหรือกลุ่มที่ต้องการ" (Share with specific people or groups)** -> กด **"เพิ่มบุคคลและกลุ่ม" (Add people and groups)**
+4. ใส่อีเมล `peng24@gmail.com` และเลือกสิทธิ์เป็น **"ทำการเปลี่ยนแปลงกิจกรรม" (Make changes to events)** หรือ **"ทำการเปลี่ยนแปลงและจัดการการแชร์"** -> กด **ส่ง (Send)**
+
+---
+
 ### 1. เข้าสู่ระบบ Google Apps Script
-1. ล็อกอินเข้าสู่บัญชี Google: `sarabun07@gmail.com` (หรือบัญชีที่ดูแลปฏิทิน สชป.7)
+1. ล็อกอินเข้าสู่บัญชี Google: `peng24@gmail.com`
 2. เปิดเบราว์เซอร์ไปที่: [https://script.google.com/home/start](https://script.google.com/home/start)
 3. กดปุ่ม **"โครงการใหม่" (New Project)** ที่มุมซ้ายบน
 4. ตั้งชื่อโครงการว่า: `RIO7 Meeting Calendar API`
@@ -26,7 +35,7 @@ Backend นี้ใช้ Google Apps Script ทำหน้าที่เช�
 2. คลิกไอคอนรูปเฟือง ⚙️ ข้าง "เลือกประเภท" -> เลือก **"เว็บแอป" (Web app)**
 3. ตั้งค่าดังนี้:
    - **คำอธิบาย (Description)**: `RIO7 Calendar API v1`
-   - **เรียกใช้ในฐานะ (Execute as)**: `ฉัน (sarabun07@gmail.com)` *(เพื่อให้มีสิทธิ์จัดการ Calendar และ Drive อัตโนมัติ)*
+   - **เรียกใช้ในฐานะ (Execute as)**: `ฉัน (peng24@gmail.com)`
    - **ผู้มีสิทธิ์เข้าถึง (Who has access)**: **`ทุกคน (Anyone)`** *(สำคัญมาก เพื่อให้หน้าเว็บส่งคำขอมาได้)*
 4. กดปุ่ม **"ทำให้ใช้งานได้" (Deploy)**
 5. ในครั้งแรก Google จะขอสิทธิ์เข้าถึง (Authorize access):
